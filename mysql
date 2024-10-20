@@ -1,4 +1,4 @@
-# Flipkart MySQL Project
+# swiggy MySQL Project
 
 ## Project Overview
 This project is a collection of SQL queries designed to analyze customer and order data for a
@@ -6,7 +6,7 @@ food delivery service similar to **Swiggy**. The queries address various busines
 such as identifying loyal customers, average prices, and month-over-month revenue growth.
 
 ## SQL Queries
-Here is a list of the key queries included in the `flipkart_project.sql` file:
+Here is a list of the key queries included in the `swiggy_project.sql` file:
 
 ### 1. Users who have not placed a single order on Swiggy
 ```sql
