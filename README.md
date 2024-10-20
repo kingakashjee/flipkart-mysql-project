@@ -1,1 +1,1 @@
-# flipkart-mysql-project
+# swiggy-mysql-project
