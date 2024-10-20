@@ -1,0 +1,194 @@
+# Flipkart MySQL Project
+
+## Project Overview
+This project is a collection of SQL queries designed to analyze customer and order data for a
+food delivery service similar to **Swiggy**. The queries address various business metrics,
+such as identifying loyal customers, average prices, and month-over-month revenue growth.
+
+## SQL Queries
+Here is a list of the key queries included in the `flipkart_project.sql` file:
+
+### 1. Users who have not placed a single order on Swiggy
+```sql
+SELECT name 
+FROM users
+WHERE user_id NOT IN (
+  SELECT DISTINCT(user_id) 
+  FROM orders
+  ORDER BY user_id 
+);
+
+output
+"name"
+"Anupama"
+"Rishabh"
+
+
+-- 2. Finding the average price per dish
+SELECT f.f_name, round(AVG(amount),2) AS average_price
+FROM order_details od 
+JOIN orders o ON o.order_id = od.order_id
+JOIN food f ON f.f_id = od.f_id
+GROUP BY f_name
+ORDER BY average_price DESC;
+
+result :- 
+"f_name"	"average_price"
+"Veg Pizza"	950.00
+"Chicken Popcorn"	645.00
+"Non-veg Pizza"	610.00
+"Choco Lava cake"	493.85
+"Schezwan Noodles"	462.50
+"Veg Manchurian"	462.50
+"Chicken Wings"	446.25
+"Rice Meal"	342.50
+"Rava Idli"	300.00
+"Masala Dosa"	270.00
+"Roti meal"	220.00
+
+ -- 3rdFinding the restaurant with the maximum orders in July
+
+SELECT r_name 
+FROM restaurants 
+WHERE r_id IN (
+  SELECT o.r_id 
+  FROM order_details od
+  LEFT JOIN orders o ON od.order_id = o.order_id
+  LEFT JOIN restaurants r ON r.r_id = o.r_id
+  WHERE EXTRACT(month FROM date) = 7
+  GROUP BY o.r_id  
+  ORDER BY COUNT(id) DESC  
+  LIMIT 1 
+);
+
+result
+"r_name"
+"kfc"
+
+
+-- 4. Restaurants with monthly sales greater than a specific amount
+
+SELECT r.r_id, r_name, SUM(amount) AS monthly_revenue
+FROM orders o
+LEFT JOIN restaurants r ON r.r_id = o.r_id
+WHERE EXTRACT(month FROM date) = 7
+GROUP BY r.r_id 
+HAVING SUM(amount) > 1000;
+
+output
+"r_id"	"r_name"	"monthly_revenue"
+1	"dominos"	1100
+2	"kfc"	1935
+5	"China Town"	1050
+
+
+-- 5. Orders and order details for a particular customer in a given date range
+
+SELECT u.name, r.r_name, f.f_name, amount, 
+SUM(amount) OVER (PARTITION BY r.r_id) AS total_sum_by_restaurant
+FROM orders o
+JOIN users u ON u.user_id = o.user_id
+JOIN restaurants r ON r.r_id = o.r_id
+JOIN order_details od ON od.order_id = o.order_id
+JOIN food f ON f.f_id = od.f_id
+WHERE u.user_id = 4 AND (date BETWEEN '2022/05/15' AND '2022/07/15');
+
+result :-
+"name"	"r_name"	"f_name"	"amount"	"total_sum_by_restaurant"
+"Ankit"	"Dosa Plaza"	"Masala Dosa"	300	2000
+"Ankit"	"Dosa Plaza"	"Rava Idli"	300	2000
+"Ankit"	"Dosa Plaza"	"Masala Dosa"	300	2000
+"Ankit"	"Dosa Plaza"	"Rava Idli"	300	2000
+"Ankit"	"Dosa Plaza"	"Schezwan Noodles"	400	2000
+"Ankit"	"Dosa Plaza"	"Veg Manchurian"	400	2000
+"Ankit"	"China Town"	"Schezwan Noodles"	400	1600
+"Ankit"	"China Town"	"Veg Manchurian"	400	1600
+"Ankit"	"China Town"	"Schezwan Noodles"	400	1600
+"Ankit"	"China Town"	"Veg Manchurian"	400	1600
+
+-- 6. Restaurant with the maximum number of repeated customers
+
+SELECT r.r_name, user_id, COUNT(user_id) AS total_orders
+FROM orders o
+RIGHT JOIN order_details od ON od.order_id = o.order_id
+LEFT JOIN restaurants r ON r.r_id = o.r_id
+GROUP BY r.r_id, user_id 
+ORDER BY total_orders DESC
+LIMIT 1;
+output-
+"r_name"	"user_id"	"total_orders"
+"kfc"	5	9
+
+-- 7. Month-over-month revenue growth for Swiggy
+
+SELECT month, total AS revenue, 
+100 * (total / LAG(total) OVER (ORDER BY month) - 1) AS mom_growth 
+FROM (
+  SELECT EXTRACT(month FROM date) AS month, SUM(amount) AS total
+  FROM orders o
+  RIGHT JOIN order_details od ON od.order_id = o.order_id
+  GROUP BY month 
+  ORDER BY month 
+) AS j1;
+
+output
+"month"	"revenue"	"mom_growth"
+5	3990	
+6	6930	73.6842105263157900
+7	12275	77.1284271284271300
+
+-- 8. Customers with their favorite food and frequency
+
+WITH cte1 AS (
+  SELECT o.user_id, od.f_id, COUNT(*) AS frequency 
+  FROM order_details od
+  JOIN orders o ON o.order_id = od.order_id
+  GROUP BY o.user_id, od.f_id 
+  ORDER BY user_id, frequency DESC
+)
+SELECT u.name, f.f_name, c1.frequency 
+FROM cte1 c1 
+JOIN users u ON u.user_id = c1.user_id
+JOIN food f ON f.f_id = c1.f_id
+WHERE c1.frequency = (
+  SELECT MAX(frequency) FROM cte1 c2 
+  WHERE c2.user_id = c1.user_id
+);
+
+output-
+"name"	"f_name"	"frequency"
+"Nitish"	"Choco Lava cake"	5
+"Khushboo"	"Choco Lava cake"	3
+"Neha"	"Choco Lava cake"	5
+"Vartika"	"Chicken Wings"	3
+"Ankit"	"Schezwan Noodles"	3
+"Ankit"	"Veg Manchurian"	3
+
+-- 9. Finding the most loyal customer for each restaurant
+
+WITH cte1 AS (
+  SELECT r_id, user_id, COUNT(*) AS total
+  FROM orders o
+  RIGHT JOIN order_details od ON o.order_id = od.order_id 
+  GROUP BY r_id, user_id 
+  ORDER BY r_id, total DESC
+)
+SELECT r_id, user_id AS most_loyal_customer, total AS orders
+FROM cte1 c1 
+WHERE c1.total = (
+  SELECT MAX(total)
+  FROM cte1 c2
+  WHERE c1.r_id = c2.r_id
+);
+
+output - 
+"r_id"	"most_loyal_customer"	"orders"
+1	5	4
+2	5	9
+3	1	6
+4	4	6
+5	4	4
+
+
+---
+
